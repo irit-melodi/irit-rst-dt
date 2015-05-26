@@ -50,6 +50,9 @@ from .attelo_cfg import (combined_key,
 
 # PATHS
 
+CONFIG_FILE = fp.splitext(__file__)[0] + '.py'
+
+
 LOCAL_TMP = 'TMP'
 """Things we may want to hold on to (eg. for weeks), but could
 live with throwing away as needed"""
