@@ -7,13 +7,16 @@ In the future we may move this to a proper configuration file.
 # License: CeCILL-B (French BSD3-like)
 
 from __future__ import print_function
+from collections import namedtuple
+from os import path as fp
 import itertools as itr
+import six
 
+import educe.stac.corpus
 import numpy as np
 
 from attelo.harness.config import (EvaluationConfig,
                                    LearnerConfig,
-                                   ParserConfig,
                                    Keyed)
 
 from attelo.decoding.baseline import (LocalBaseline)
@@ -35,18 +38,12 @@ from attelo.parser.intra import (HeadToHeadParser,
 from attelo.parser.full import (JointPipeline,
                                 PostlabelPipeline)
 
-
 from sklearn.linear_model import (LogisticRegression,
                                   Perceptron as SkPerceptron,
                                   PassiveAggressiveClassifier as
                                   SkPassiveAggressiveClassifier)
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from .attelo_cfg import (combined_key,
-                         DecodingMode,
-                         IntraStrategy,
-                         Settings,
-                         IntraFlag)
 
 # PATHS
 
@@ -121,17 +118,46 @@ and even across different runs of gather.
 NB. It's up to you to ensure that the folds file makes sense
 """
 
-def decoder_local(settings):
-    "our instantiation of the local baseline decoder"
-    use_prob = settings.mode != DecodingMode.post_label
-    return LocalBaseline(0.2, use_prob)
 
+Settings = namedtuple('Settings',
+                      ['key', 'intra', 'oracle', 'children'])
+"""
+Note that this is subclass of Keyed
 
-def decoder_mst(settings):
+The settings are used for config management only, for example,
+if we want to filter in/out configurations that involve an
+oracle.
+
+Parameters
+----------
+intra: bool
+    If this config uses intra/inter decoding
+
+oracle: bool
+    If parser should be considered oracle-based
+
+children: container(Settings)
+    Any nested settings (eg. if intra/inter, this would be the
+    the settings of the intra and inter decoders)
+"""
+
+def combined_key(*variants):
+    """return a key from a list of objects that have a
+    `key` field each"""
+    return '-'.join(v if isinstance(v, six.string_types) else v.key
+                    for v in variants)
+
+def decoder_last():
     "our instantiation of the mst decoder"
-    use_prob = settings.mode != DecodingMode.post_label
-    return MstDecoder(MstRootStrategy.fake_root,
-                      use_prob)
+    return Keyed('last', LastBaseline())
+
+def decoder_local():
+    "our instantiation of the mst decoder"
+    return Keyed('local', LocalBaseline(0.2, True))
+
+def decoder_mst():
+    "our instantiation of the mst decoder"
+    return Keyed('mst', MstDecoder(MstRootStrategy.leftmost, True))
 
 
 def attach_learner_oracle():
@@ -230,15 +256,17 @@ STRUCT_PA_ARGS = PerceptronArgs(iterations=50,
                                 use_prob=False,
                                 aggressiveness=np.inf)
 
+ORACLE = LearnerConfig(attach=attach_learner_oracle(),
+                       label=label_learner_oracle())
+
 _LOCAL_LEARNERS = [
-    LearnerConfig(attach=attach_learner_oracle(),
-                  label=label_learner_oracle()),
+    ORACLE,
     LearnerConfig(attach=attach_learner_maxent(),
                   label=label_learner_maxent()),
-    LearnerConfig(attach=attach_learner_maxent(),
-                  label=label_learner_oracle()),
-    LearnerConfig(attach=attach_learner_rndforest(),
-                  label=label_learner_rndforest()),
+#    LearnerConfig(attach=attach_learner_maxent(),
+#                  label=label_learner_oracle()),
+#    LearnerConfig(attach=attach_learner_rndforest(),
+#                  label=label_learner_rndforest()),
 #    LearnerConfig(attach=attach_learner_perc(),
 #                  label=label_learner_maxent()),
 #    LearnerConfig(attach=attach_learner_pa(),
@@ -268,62 +296,71 @@ _STRUCTURED_LEARNERS = [
 We assume that they cannot be used relation modelling
 """
 
+def _core_settings(key, klearner):
+    "settings for basic pipelines"
+    return Settings(key=key,
+                    intra=False,
+                    oracle='oracle' in klearner.key,
+                    children=None)
 
-_CORE_DECODERS = [
-    Keyed('local', decoder_local),
-    Keyed('mst', decoder_mst),
-#    Keyed('asmany', lambda _: AsManyDecoder()),
-#    Keyed('bestin', lambda _: BestIncomingDecoder()),
+def mk_joint(klearner, kdecoder):
+    "return a joint decoding parser config"
+    settings = _core_settings('AD.L-jnt', klearner)
+    parser_key = combined_key(settings, kdecoder)
+    key = combined_key(klearner, parser_key)
+    parser = JointPipeline(learner_attach=klearner.attach.payload,
+                           learner_label=klearner.label.payload,
+                           decoder=kdecoder.payload)
+    return EvaluationConfig(key=key,
+                            settings=settings,
+                            learner=klearner,
+                            parser=Keyed(parser_key, parser))
+
+
+def mk_post(klearner, kdecoder):
+    "return a post label parser"
+    settings = _core_settings('AD.L-pst', klearner)
+    parser_key = combined_key(settings, kdecoder)
+    key = combined_key(klearner, parser_key)
+    parser = PostlabelPipeline(learner_attach=klearner.attach.payload,
+                               learner_label=klearner.label.payload,
+                               decoder=kdecoder.payload)
+    return EvaluationConfig(key=key,
+                            settings=settings,
+                            learner=klearner,
+                            parser=Keyed(parser_key, parser))
+
+
+def _core_parsers(klearner):
+    """Our basic parser configurations
+    """
+    return [
+        # joint
+        #mk_joint(klearner, decoder_last()),
+        mk_joint(klearner, decoder_local()),
+        #mk_joint(klearner, decoder_mst()),
+        #mk_joint(klearner, tc_decoder(decoder_local())),
+        mk_joint(klearner, tc_decoder(decoder_mst())),
+
+        # postlabeling
+        #mk_post(klearner, decoder_last()),
+        mk_post(klearner, decoder_local()),
+        #mk_post(klearner, decoder_mst()),
+        #mk_post(klearner, tc_decoder(decoder_local())),
+        mk_post(klearner, tc_decoder(decoder_mst())),
+    ]
+
+
+_INTRA_INTER_CONFIGS = [
+    Keyed('iheads', HeadToHeadParser),
+    Keyed('ionly', SentOnlyParser),
+    Keyed('isoft', SoftParser),
 ]
 
-"""Attelo decoders to try in experiment
 
-Don't forget that you can parameterise the decoders ::
-
-    Keyed('astar-3-best' decoder_astar(nbest=3))
-"""
-
-
-_SETTINGS = [
-    Settings(key='AD.L_jnt_intra_soft',
-             mode=DecodingMode.joint,
-             intra=IntraFlag(strategy=IntraStrategy.soft,
-                             intra_oracle=False,
-                             inter_oracle=False)),
-    Settings(key='AD.L_jnt_intra_heads',
-             mode=DecodingMode.joint,
-             intra=IntraFlag(strategy=IntraStrategy.heads,
-                             intra_oracle=False,
-                             inter_oracle=False)),
-    Settings(key='AD.L_jnt_intra_only',
-             mode=DecodingMode.joint,
-             intra=IntraFlag(strategy=IntraStrategy.only,
-                             intra_oracle=False,
-                             inter_oracle=False)),
-    Settings(key='AD.L_jnt',
-             mode=DecodingMode.joint,
-             intra=None),
-    Settings(key='AD.L_pst',
-             mode=DecodingMode.post_label,
-             intra=None),
-    ]
-"""Variants on global settings that would generally apply
-over all decoder combos.
-
-    Variant(key="post-label",
-            name=None,
-            flags=["--post-label"])
-
-The name field is ignored here.
-
-Note that not all global settings may be applicable to
-all decoders.  For example, some learners may only
-supoort '--post-label' decoding.
-
-You may need to write some fancy logic when building the
-EVALUATIONS list below in order to exclude these
-possibilities
-"""
+# -------------------------------------------------------------------------------
+# maybe less to edit below but still worth having a glance
+# -------------------------------------------------------------------------------
 
 HARNESS_NAME = 'irit-rst-dt'
 
@@ -438,37 +475,22 @@ def _mk_evaluations():
 
     This would be so much easier with static typing
 
-    :rtype [(Keyed(learner), KeyedDecoder)]
-    """
-
-    kparsers = [_mk_parser_config(d, s)
-                for d, s in itr.product(_CORE_DECODERS, _SETTINGS)]
-    kparsers = [k for k in kparsers if k is not None]
-
-    # all learner/decoder pairs
-    pairs = []
-    pairs.extend(itr.product(_LOCAL_LEARNERS, kparsers))
-    for klearner in _STRUCTURED_LEARNERS:
-        pairs.extend((klearner(x.decoder), x) for x in kparsers)
-
-    # boxing this up a little bit more conveniently
-    configs = []
-    for klearner, kparser_ in pairs:
-        if _is_junk(klearner, kparser_):
-            continue
-        kparser = ParserConfig(key=kparser_.key,
-                               decoder=kparser_.decoder,
-                               payload=kparser_.payload(klearner),
-                               settings=kparser_.settings)
-        cfg = EvaluationConfig(key=combined_key([klearner, kparser]),
-                               settings=kparser.settings,
-                               learner=klearner,
-                               parser=kparser)
-        configs.append(cfg)
-    return configs
+def _evaluations():
+    "the evaluations we want to run"
+    ipairs = list(itr.product(_LOCAL_LEARNERS, _INTRA_INTER_CONFIGS))
+    res = concat_l([
+        concat_l(_core_parsers(l) for l in _LOCAL_LEARNERS),
+        concat_l(_mk_basic_intras(l, x) for l, x in ipairs),
+        concat_l(_mk_sorc_intras(l, x) for l, x in ipairs),
+        concat_l(_mk_dorc_intras(l, x) for l, x in ipairs),
+        concat_l(_mk_last_intras(l, x) for l, x in ipairs),
+    ])
+    return [x for x in res if not _is_junk(x)]
 
 
-EVALUATIONS = _mk_evaluations()
+EVALUATIONS = _evaluations()
+
+
 """Learners and decoders that are associated with each other.
 The idea her is that if multiple decoders have a learner in
 common, we will avoid rebuilding the model associated with
