@@ -56,7 +56,7 @@ class IritHarness(Harness):
 
     @property
     def config_files(self):
-        return CONFIG_FILE
+        return [CONFIG_FILE]
 
     @property
     def evaluations(self):
