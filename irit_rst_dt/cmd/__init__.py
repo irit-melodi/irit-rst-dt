@@ -7,11 +7,14 @@ irit-rst-dt subcommands
 
 from . import (clean,
                evaluate,
-               gather)
+               gather,
+               preview)
+
 
 SUBCOMMANDS =\
     [
         gather,
         evaluate,
         clean,
+        preview,
     ]
