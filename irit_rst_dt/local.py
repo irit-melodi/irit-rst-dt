@@ -326,8 +326,8 @@ EVALUATIONS = _evaluations()
 
 
 GRAPH_DOCS = [
-    's2-league4-game1_07_stac_1396964826',
-    's2-league4-game1_02_stac_1396964918',
+    'wsj_1184.out',
+    'wsj_1120.out',
 ]
 """Just the documents that you want to graph.
 Set to None to graph everything
