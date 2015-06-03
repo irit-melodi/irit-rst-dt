@@ -43,8 +43,9 @@ from .config.common import (ORACLE,
                             combined_key,
                             decoder_last,
                             decoder_local,
-                            # mk_joint,
-                            mk_post)
+                            mk_joint,
+                            #mk_post,
+                            )
 
 # PATHS
 
@@ -73,8 +74,8 @@ is used in more than one corpus, but we can revisit this scheme as
 needed.
 """
 
-TEST_CORPUS = None
-# TEST_CORPUS = 'tiny'
+# TEST_CORPUS = None
+TEST_CORPUS = 'corpus/RSTtrees-WSJ-main-1.0/TEST'
 """Corpora for use in FINAL testing.
 
 You should probably leave this set to None until you've tuned and
@@ -86,7 +87,7 @@ validation on the training data)
 """
 
 TEST_EVALUATION_KEY = None
-# TEST_EVALUATION_KEY = 'maxent-AD.L_jnt-mst'
+# TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-mst'
 """Evaluation to use for testing.
 
 Leave this to None until you think it's OK to look at the test data.
@@ -208,16 +209,16 @@ def _core_parsers(klearner):
     """
     # joint
     joint = [
-        # mk_joint(klearner, decoder_last()),
-        # mk_joint(klearner, DECODER_LOCAL),
-        # mk_joint(klearner, decoder_mst()),
+        mk_joint(klearner, decoder_last()),
+        mk_joint(klearner, DECODER_LOCAL),
+        mk_joint(klearner, decoder_mst()),
     ]
 
     # postlabeling
     post = [
-        mk_post(klearner, decoder_last()),
-        mk_post(klearner, DECODER_LOCAL),
-        mk_post(klearner, decoder_mst()),
+        # mk_post(klearner, decoder_last()),
+        # mk_post(klearner, DECODER_LOCAL),
+        # mk_post(klearner, decoder_mst()),
     ]
     if klearner.attach.payload.can_predict_proba:
         return joint + post
@@ -269,7 +270,7 @@ def _mk_last_intras(klearner, kconf):
     """
     kconf = Keyed(key=combined_key('last', kconf),
                   payload=kconf.payload)
-    econf_last = mk_post(klearner, decoder_last())
+    econf_last = mk_joint(klearner, decoder_last())
     return [combine_intra(IntraInterPair(intra=econf_last, inter=p),
                           kconf,
                           primary='inter')
