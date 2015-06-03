@@ -74,8 +74,8 @@ is used in more than one corpus, but we can revisit this scheme as
 needed.
 """
 
-TEST_CORPUS = None
-# TEST_CORPUS = 'tiny'
+# TEST_CORPUS = None
+TEST_CORPUS = 'corpus/RSTtrees-WSJ-main-1.0/TEST'
 """Corpora for use in FINAL testing.
 
 You should probably leave this set to None until you've tuned and
