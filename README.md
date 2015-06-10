@@ -6,7 +6,7 @@ Melodi team in IRIT on the RST Discourse Treebank corpus.
 1. Python 2.7. Python 3 might also work.
 2. pip 1.5 or greater
 3. git (to keep up with educe/attelo changes)
-4. [optional] Anacoda (`conda --version` should say 2.2.6 or higher)
+4. Anacoda or miniconda (`conda --version` should say 2.2.6 or higher)
 5. a copy of the RST Discourse Treebank
 
 ## Sandboxing
@@ -20,7 +20,7 @@ particularly conda (Anaconda on Mac, Miniconda on Linux)
 1. Create your virtual environment
 
    ```
-   conda create -n irit-rst-dt scipy
+   conda create -n irit-rst-dt pip scipy scikit-learn
    ```
 
 2. Activate the virtual environment (note that you'll need to do
@@ -66,12 +66,6 @@ which subcorpus we run this on. I would suggest making a sample out of
 harness first. You could likewise also consider reducing the learners
 and decoders you want to experiment with initially.
 
-Note that the current configuration assumes that learners and decoders
-are independent of each other. If you have something like the structured
-perceptron learner which depends on its decoder, talk to Eric. Likewise,
-we don't yet offer a way to change the configuration settings for the
-learners/decoders. Talk to Eric about improving the harness.
-
 ### Basics
 
 Using the harness consists of two steps, gathering the features, and
@@ -88,24 +82,24 @@ by running
 The harness will try to detect what work it has already done and pick
 up where it left off.
 
-### Scores
+### Scores and reports
 
 You can get a sense of how things are going by inspecting the various
 intermediary results
 
-1. count files: At each learner/decoder combination we will count
-   the number of correct attachments and relation labels (and save
-   these into intermediary count) (for a given fold N, see
-   `TMP/latest/scratch-current/fold-N/count-*.csv`)
+1. output files: Outputs for any decoders in a fold that happen to
+   have finished running (for a given fold N, see
+   `TMP/latest/scratch-current/fold-N/output.*`)
 
-2. fold summaries: At the end of each fold, we will summarise all of
+2. fold reports : At the end of each fold, we will summarise all of
    the counts into a simple Precision/Recall/F1 report for attachment
    and labelling. (for a given fold N, see
-   `TMP/latest/scratch-current/fold-N/scores*.txt`)
+   `TMP/latest/scratch-current/fold-N/reports-*`)
 
-3. full summary: If we make it through the entire experiment, we will
+3. full reports: If we make it through the entire experiment, we will
    produce a cross-validation summary combining the counts from all
-   folds (`TMP/latest/eval-current/scores*.txt`)
+   folds and several other things
+   (`TMP/latest/eval-current/reports-*`)
 
 ### Cleanup
 
