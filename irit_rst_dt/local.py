@@ -16,6 +16,7 @@ from attelo.harness.config import (LearnerConfig,
 #                                    AstarDecoder,
 #                                    Heuristic,
 #                                    RfcConstraint)
+from attelo.decoding.eisner import EisnerDecoder
 from attelo.decoding.mst import (MstDecoder, MstRootStrategy)
 from attelo.learning.local import (SklearnAttachClassifier,
                                    SklearnLabelClassifier)
@@ -88,6 +89,7 @@ validation on the training data)
 
 TEST_EVALUATION_KEY = None
 # TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-mst'
+# TEST_EVALUATION_KEY = 'maxent-AD.L-jnt-eisner'
 """Evaluation to use for testing.
 
 Leave this to None until you think it's OK to look at the test data.
@@ -122,6 +124,11 @@ NB. It's up to you to ensure that the folds file makes sense
 
 DECODER_LOCAL = decoder_local(0.2)
 "local decoder should accept above this score"
+
+
+def decoder_eisner():
+    "our instantiation of the Eisner decoder"
+    return Keyed('eisner', EisnerDecoder(use_prob=True))
 
 
 def decoder_mst():
@@ -212,6 +219,7 @@ def _core_parsers(klearner):
         mk_joint(klearner, decoder_last()),
         mk_joint(klearner, DECODER_LOCAL),
         mk_joint(klearner, decoder_mst()),
+        mk_joint(klearner, decoder_eisner()),
     ]
 
     # postlabeling
@@ -219,6 +227,7 @@ def _core_parsers(klearner):
         # mk_post(klearner, decoder_last()),
         # mk_post(klearner, DECODER_LOCAL),
         # mk_post(klearner, decoder_mst()),
+        # mk_post(klearner, decoder_eisner()),
     ]
     if klearner.attach.payload.can_predict_proba:
         return joint + post
@@ -306,12 +315,15 @@ def _is_junk(econf):
 
 def _evaluations():
     "the evaluations we want to run"
-    # non-prob mst decoder (dp learners don't do probs)
+    # current structured learners don't do probs
+    # hence non-prob decoders
     nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
+    nonprob_eisner = EisnerDecoder(use_prob=False)
     #
     learners = []
     learners.extend(_LOCAL_LEARNERS)
     learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+    learners.extend(l(nonprob_eisner) for l in _STRUCTURED_LEARNERS)
     ipairs = list(itr.product(learners, _INTRA_INTER_CONFIGS))
     res = concat_l([
         concat_l(_core_parsers(l) for l in learners),
@@ -347,7 +359,8 @@ def _want_details(econf):
     kids = econf.settings.children
     has_intra_oracle = has.intra and (kids.intra.oracle or kids.inter.oracle)
     return (has_maxent and
-            ('mst' in econf.parser.key or 'astar' in econf.parser.key) and
+            ('mst' in econf.parser.key or 'astar' in econf.parser.key or
+             'eisner' in econf.parser.key) and
             not has_intra_oracle)
 
 DETAILED_EVALUATIONS = [e for e in EVALUATIONS if _want_details(e)]
