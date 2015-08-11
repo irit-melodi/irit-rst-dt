@@ -67,6 +67,7 @@ on different aspects of the system in a shared space. One of the users
    done
    vim cluster/env
    vim cluster/gather.script
+   vim cluster/report.script
    ```
 
 ## Using the cluster scripts
