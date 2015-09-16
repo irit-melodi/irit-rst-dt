@@ -32,21 +32,22 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 from .config.intra import (combine_intra)
-# from .config.perceptron import (attach_learner_dp_pa,
-#                                 attach_learner_dp_perc,
-#                                 attach_learner_pa,
-#                                 attach_learner_perc,
-#                                 label_learner_dp_pa,
-#                                 label_learner_dp_perc,
-#                                 attach_learner_pa,
-#                                 attach_learner_perc)
+from .config.perceptron import (attach_learner_dp_pa,
+                                attach_learner_dp_perc,
+                                attach_learner_dp_struct_pa,
+                                attach_learner_dp_struct_perc,
+                                attach_learner_pa,
+                                attach_learner_perc,
+                                label_learner_dp_pa,
+                                label_learner_dp_perc,
+                                label_learner_pa,
+                                label_learner_perc)
 from .config.common import (ORACLE,
                             combined_key,
                             decoder_last,
                             decoder_local,
                             mk_joint,
-                            #mk_post,
-                            )
+                            mk_post)
 
 # PATHS
 
@@ -167,6 +168,7 @@ def label_learner_rndforest():
     "return a keyed instance of decision tree learner"
     return Keyed('rndforest', SklearnLabelClassifier(RandomForestClassifier()))
 
+
 _LOCAL_LEARNERS = [
     #    ORACLE,
     #    LearnerConfig(attach=attach_learner_maxent(),
@@ -198,7 +200,7 @@ def _structured(klearner):
     """learner configuration pair for a structured learner
 
     (parameterised on a decoder)"""
-    return lambda d: LearnerConfig(attach=tc_learner(klearner(d)),
+    return lambda d: LearnerConfig(attach=klearner(d),
                                    label=label_learner_maxent())
 
 
@@ -215,24 +217,31 @@ def _core_parsers(klearner):
     """Our basic parser configurations
     """
     # joint
-    joint = [
-        mk_joint(klearner, decoder_last()),
-        mk_joint(klearner, DECODER_LOCAL),
-        mk_joint(klearner, decoder_mst()),
-        mk_joint(klearner, decoder_eisner()),
-    ]
+    if ((not klearner.attach.payload.can_predict_proba or
+         not klearner.label.payload.can_predict_proba)):
+        joint = []
+    else:
+        joint = [
+            mk_joint(klearner, d) for d in [
+                # decoder_last(),
+                # DECODER_LOCAL,
+                # decoder_mst(),
+                decoder_eisner(),
+            ]
+        ]
 
     # postlabeling
     post = [
-        # mk_post(klearner, decoder_last()),
-        # mk_post(klearner, DECODER_LOCAL),
-        # mk_post(klearner, decoder_mst()),
-        # mk_post(klearner, decoder_eisner()),
+        mk_post(klearner, d) for d in [
+            # decoder_last() ,
+            # DECODER_LOCAL,
+            # decoder_mst(),
+            decoder_eisner(),
+        ]
     ]
-    if klearner.attach.payload.can_predict_proba:
-        return joint + post
-    else:
-        return post
+
+    return joint + post
+
 
 _INTRA_INTER_CONFIGS = [
     Keyed('iheads', HeadToHeadParser),
@@ -274,9 +283,12 @@ def _mk_dorc_intras(klearner, kconf):
 
 
 def _mk_last_intras(klearner, kconf):
-    """Intra/inter parsers based on a single core parser
-    and the last baseline
+    """Parsers using "last" for intra and a core decoder for inter.
     """
+    if ((not klearner.attach.payload.can_predict_proba or
+         not klearner.label.payload.can_predict_proba)):
+        return []
+
     kconf = Keyed(key=combined_key('last', kconf),
                   payload=kconf.payload)
     econf_last = mk_joint(klearner, decoder_last())
@@ -315,16 +327,19 @@ def _is_junk(econf):
 
 def _evaluations():
     "the evaluations we want to run"
-    # current structured learners don't do probs
-    # hence non-prob decoders
-    nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
-    nonprob_eisner = EisnerDecoder(use_prob=False)
-    #
+    # list of learners, local and structured
     learners = []
     learners.extend(_LOCAL_LEARNERS)
-    learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+    # current structured learners don't do probs
+    # hence non-prob decoders
+    # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
+    # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+    nonprob_eisner = EisnerDecoder(use_prob=False)
     learners.extend(l(nonprob_eisner) for l in _STRUCTURED_LEARNERS)
+    # cross-product of learners and intra/inter-sentential configs
     ipairs = list(itr.product(learners, _INTRA_INTER_CONFIGS))
+    # concatenate all of the above configurations, plus sentence-
+    # and document-level oracles for intra/inter configs
     res = concat_l([
         concat_l(_core_parsers(l) for l in learners),
         concat_l(_mk_basic_intras(l, x) for l, x in ipairs),
