@@ -24,7 +24,6 @@ from attelo.parser.intra import (IntraInterPair,
                                  HeadToHeadParser,
                                  # SentOnlyParser,
                                  SoftParser)
-from attelo.util import (concat_l)
 
 from sklearn.linear_model import (LogisticRegression)
 from sklearn.tree import DecisionTreeClassifier
@@ -213,7 +212,7 @@ We assume that they cannot be used relation modelling
 """
 
 
-def _core_parsers(klearner):
+def _core_parsers(klearner, unique_real_root=True):
     """Our basic parser configurations
     """
     # joint
@@ -226,17 +225,22 @@ def _core_parsers(klearner):
                 # decoder_last(),
                 # DECODER_LOCAL,
                 # decoder_mst(),
-                decoder_eisner(),
+                Keyed('eisner',
+                      EisnerDecoder(unique_real_root=unique_real_root,
+                                    use_prob=True)),
             ]
         ]
 
     # postlabeling
+    use_prob = klearner.attach.payload.can_predict_proba
     post = [
         mk_post(klearner, d) for d in [
             # decoder_last() ,
             # DECODER_LOCAL,
             # decoder_mst(),
-            decoder_eisner(),
+            Keyed('eisner',
+                  EisnerDecoder(unique_real_root=unique_real_root,
+                                use_prob=use_prob)),
         ]
     ]
 
@@ -257,11 +261,16 @@ _INTRA_INTER_CONFIGS = [
 HARNESS_NAME = 'irit-rst-dt'
 
 
+# possibly obsolete
 def _mk_basic_intras(klearner, kconf):
     """Intra/inter parser based on a single core parser
     """
-    return [combine_intra(IntraInterPair(x, x), kconf)
-            for x in _core_parsers(klearner)]
+    # NEW intra parsers are explicitly authorized to have more than one
+    # real root (necessary for the Eisner decoder, maybe other decoders too)
+    parsers = [IntraInterPair(intra=x, inter=y) for x, y in
+               zip(_core_parsers(klearner, unique_real_root=False),
+                   _core_parsers(klearner))]
+    return [combine_intra(p, kconf) for p in parsers]
 
 
 def _mk_sorc_intras(klearner, kconf):
@@ -269,7 +278,8 @@ def _mk_sorc_intras(klearner, kconf):
     and a sentence oracle
     """
     parsers = [IntraInterPair(intra=x, inter=y) for x, y in
-               zip(_core_parsers(ORACLE), _core_parsers(klearner))]
+               zip(_core_parsers(ORACLE, unique_real_root=False),
+                   _core_parsers(klearner))]
     return [combine_intra(p, kconf, primary='inter') for p in parsers]
 
 
@@ -278,7 +288,8 @@ def _mk_dorc_intras(klearner, kconf):
     and a document oracle
     """
     parsers = [IntraInterPair(intra=x, inter=y) for x, y in
-               zip(_core_parsers(klearner), _core_parsers(ORACLE))]
+               zip(_core_parsers(klearner, unique_real_root=False),
+                   _core_parsers(ORACLE))]
     return [combine_intra(p, kconf, primary='intra') for p in parsers]
 
 
@@ -292,10 +303,10 @@ def _mk_last_intras(klearner, kconf):
     kconf = Keyed(key=combined_key('last', kconf),
                   payload=kconf.payload)
     econf_last = mk_joint(klearner, decoder_last())
-    return [combine_intra(IntraInterPair(intra=econf_last, inter=p),
-                          kconf,
-                          primary='inter')
-            for p in _core_parsers(klearner)]
+    parsers = [IntraInterPair(intra=econf_last, inter=y) for y in
+               _core_parsers(klearner)]
+    return [combine_intra(p, kconf, primary='inter') for p in parsers]
+# end of possibly obsolete
 
 
 def _is_junk(econf):
@@ -327,26 +338,58 @@ def _is_junk(econf):
 
 def _evaluations():
     "the evaluations we want to run"
-    # list of learners, local and structured
+    res = []
+
+    # == one-step (global) parsers ==
     learners = []
     learners.extend(_LOCAL_LEARNERS)
-    # current structured learners don't do probs
-    # hence non-prob decoders
-    # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
-    # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+    # current structured learners don't do probs, hence non-prob decoders
     nonprob_eisner = EisnerDecoder(use_prob=False)
     learners.extend(l(nonprob_eisner) for l in _STRUCTURED_LEARNERS)
-    # cross-product of learners and intra/inter-sentential configs
-    ipairs = list(itr.product(learners, _INTRA_INTER_CONFIGS))
-    # concatenate all of the above configurations, plus sentence-
-    # and document-level oracles for intra/inter configs
-    res = concat_l([
-        concat_l(_core_parsers(l) for l in learners),
-        concat_l(_mk_basic_intras(l, x) for l, x in ipairs),
-        concat_l(_mk_sorc_intras(l, x) for l, x in ipairs),
-        concat_l(_mk_dorc_intras(l, x) for l, x in ipairs),
-        concat_l(_mk_last_intras(l, x) for l, x in ipairs),
-    ])
+    # MST is disabled by default, as it does not output projective trees
+    # nonprob_mst = MstDecoder(MstRootStrategy.fake_root, False)
+    # learners.extend(l(nonprob_mst) for l in _STRUCTURED_LEARNERS)
+    global_parsers = itr.chain.from_iterable(_core_parsers(l)
+                                             for l in learners)
+    res.extend(global_parsers)
+
+    # == two-step parsers: intra then inter-sentential ==
+    ii_learners = []  # (intra, inter) learners
+    ii_learners.extend((klearner, klearner)
+                       for klearner in _LOCAL_LEARNERS)
+    # structured learners, cf. supra
+    intra_nonprob_eisner = EisnerDecoder(use_prob=False,
+                                         unique_real_root=False)
+    inter_nonprob_eisner = EisnerDecoder(use_prob=False,
+                                         unique_real_root=True)
+    ii_learners.extend((l(intra_nonprob_eisner), l(inter_nonprob_eisner))
+                       for l in _STRUCTURED_LEARNERS)
+    # couples of learners with either sentence- or document-level oracle
+    sorc_ii_learners = [
+        (ORACLE, inter_lnr) for intra_lnr, inter_lnr in ii_learners
+    ]
+    dorc_ii_learners = [
+        (intra_lnr, ORACLE) for intra_lnr, inter_lnr in ii_learners
+    ]
+    # enumerate pairs of (intra, inter) parsers
+    ii_pairs = []
+    for intra_lnr, inter_lnr in itr.chain(ii_learners,
+                                          sorc_ii_learners,
+                                          dorc_ii_learners):
+        # NEW intra parsers are explicitly authorized (in fact, expected)
+        # to have more than one real root ; this is necessary for the
+        # Eisner decoder and probably others, with "hard" strategies
+        ii_pairs.extend(IntraInterPair(intra=x, inter=y) for x, y in
+                        zip(_core_parsers(intra_lnr, unique_real_root=False),
+                            _core_parsers(inter_lnr, unique_real_root=True)))
+    # cross-product: pairs of parsers x intra-/inter- configs
+    ii_parsers = [combine_intra(p, kconf,
+                                primary=('inter' if p.intra.settings.oracle
+                                         else 'intra'))
+                  for p, kconf
+                  in itr.product(ii_pairs, _INTRA_INTER_CONFIGS)]
+    res.extend(ii_parsers)
+
     return [x for x in res if not _is_junk(x)]
 
 
