@@ -15,15 +15,15 @@ from attelo.learning.local import (SklearnAttachClassifier,
 
 # parameters for local perceptrons
 LOCAL_N_ITER = 20
-LOCAL_AVG = False  # was: True
-LOCAL_USE_PROB = False
+LOCAL_AVG = True  # NB: sklearn perceptrons don't offer this option
+LOCAL_USE_PROB = False  # NB: True would currently have no effect
 # parameter for local passive-aggressive
 LOCAL_C = 1.0  # was: np.inf
 
 # parameters for structured perceptrons
 STRUC_N_ITER = 50
-STRUC_AVG = False  # was: True
-STRUC_USE_PROB = False
+STRUC_AVG = True  # NB: ibid
+STRUC_USE_PROB = False  # NB: ibid
 # parameter for structured passive-aggressive
 STRUC_C = 1.0  # was: np.inf
 
