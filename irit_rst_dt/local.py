@@ -232,6 +232,7 @@ def _core_parsers(klearner, unique_real_root=True):
         ]
 
     # postlabeling
+    use_prob = klearner.attach.payload.can_predict_proba
     post = [
         mk_post(klearner, d) for d in [
             # decoder_last() ,
@@ -239,7 +240,7 @@ def _core_parsers(klearner, unique_real_root=True):
             # decoder_mst(),
             Keyed('eisner',
                   EisnerDecoder(unique_real_root=unique_real_root,
-                                use_prob=True)),
+                                use_prob=use_prob)),
         ]
     ]
 
