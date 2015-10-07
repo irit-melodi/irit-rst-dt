@@ -105,6 +105,18 @@ Where to read the Penn Treebank from (should be dir corresponding to
 parsed/mrg/wsj)
 """
 
+CORENLP_OUT_DIR = None
+# CORENLP_OUT_DIR = '/projets/melodi/corpus/rst-dt-corenlp-2015-01-29'
+"""
+Where to read parses from CoreNLP from
+"""
+
+LECSIE_DATA_DIR = None
+# LECSIE_DATA_DIR = '/projets/melodi/Polymnie/v2r/results/rstdt'
+"""
+Where to read the LECSIE features from
+"""
+
 FEATURE_SET = 'dev'  # one of ['dev', 'eyk', 'li2014']
 """
 Which feature set to use for feature extraction
