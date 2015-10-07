@@ -14,7 +14,9 @@ from attelo.harness.util import call, force_symlink
 from ..local import (TEST_CORPUS,
                      TRAINING_CORPUS,
                      PTB_DIR,
-                     FEATURE_SET)
+                     FEATURE_SET,
+                     CORENLP_OUT_DIR,
+                     LECSIE_DATA_DIR)
 from ..util import (current_tmp, latest_tmp)
 
 NAME = 'gather'
@@ -49,11 +51,21 @@ def extract_features(corpus, output_dir,
     """
     # TODO: perhaps we could just directly invoke the appropriate
     # educe module here instead of going through the command line?
-    cmd = ["rst-dt-learning", "extract",
-           corpus,
-           PTB_DIR,
-           output_dir,
-           '--feature_set', FEATURE_SET]
+    cmd = [
+        "rst-dt-learning", "extract",
+        corpus,
+        PTB_DIR,  # TODO make this optional and exclusive from CoreNLP
+        output_dir,
+        '--feature_set', FEATURE_SET,
+    ]
+    if CORENLP_OUT_DIR is not None:
+        cmd.extend([
+            '--corenlp_out_dir', CORENLP_OUT_DIR,
+        ])
+    if LECSIE_DATA_DIR is not None:
+        cmd.extend([
+            '--lecsie_data_dir', LECSIE_DATA_DIR,
+        ])
     if vocab_path is not None:
         cmd.extend(['--vocabulary', vocab_path])
     if label_path is not None:
