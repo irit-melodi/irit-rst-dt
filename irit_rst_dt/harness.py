@@ -33,8 +33,8 @@ class IritHarness(Harness):
 
     def __init__(self):
         dataset = fp.basename(TRAINING_CORPUS)
-        testset = None if TEST_CORPUS is None\
-            else fp.basename(TEST_CORPUS)
+        testset = (fp.basename(TEST_CORPUS) if TEST_CORPUS is not None
+                   else None)
         super(IritHarness, self).__init__(dataset, testset)
         self.sanity_check_config()
 
@@ -107,20 +107,6 @@ class IritHarness(Harness):
         dset = self.testset if test_data else self.dataset
         return fp.join(self.eval_dir, "%s.%s" % (dset, ext))
 
-    def _model_basename(self, rconf, mtype, ext):
-        "Basic filename for a model"
-
-        if 'attach' in mtype:
-            rsubconf = rconf.attach
-        else:
-            rsubconf = rconf.label
-
-        template = '{dataset}.{learner}.{task}.{ext}'
-        return template.format(dataset=self.dataset,
-                               learner=rsubconf.key,
-                               task=mtype,
-                               ext=ext)
-
     def mpack_paths(self, test_data, stripped=False):
         ext = 'relations.sparse'
         core_path = self._eval_data_path(ext, test_data=test_data)
@@ -130,25 +116,33 @@ class IritHarness(Harness):
                 core_path + '.vocab')
 
     def model_paths(self, rconf, fold):
-        if fold is None:
-            parent_dir = self.combined_dir_path()
-        else:
-            parent_dir = self.fold_dir_path(fold)
+        parent_dir = (self.fold_dir_path(fold) if fold is not None
+                      else self.combined_dir_path())
 
         def _eval_model_path(subconf, mtype):
             "Model for a given loop/eval config and fold"
-            bname = self._model_basename(subconf, mtype, 'model')
+            # basic filename for a model: bname
+            rsubconf = (subconf.attach if 'attach' in mtype
+                        else subconf.label)
+            fn_tmpl = '{dataset}.{learner}.{task}.{ext}'
+            bname = fn_tmpl.format(dataset=self.dataset,
+                                   learner=rsubconf.key,
+                                   task=mtype,
+                                   ext='model')
             return fp.join(parent_dir, bname)
 
         if isinstance(rconf, IntraInterPair):
-            return {'inter:attach': _eval_model_path(rconf.inter, "attach"),
-                    'inter:label': _eval_model_path(rconf.inter, "relate"),
-                    'intra:attach': _eval_model_path(rconf.intra, "sent-attach"),
-                    'intra:label': _eval_model_path(rconf.intra, "sent-relate")}
+            return {
+                'inter:attach': _eval_model_path(rconf.inter, "attach"),
+                'inter:label': _eval_model_path(rconf.inter, "relate"),
+                'intra:attach': _eval_model_path(rconf.intra, "sent-attach"),
+                'intra:label': _eval_model_path(rconf.intra, "sent-relate")
+            }
         else:
-            return {'attach': _eval_model_path(rconf, "attach"),
-                    'label': _eval_model_path(rconf, "relate")}
-
+            return {
+                'attach': _eval_model_path(rconf, "attach"),
+                'label': _eval_model_path(rconf, "relate")
+            }
 
     # ------------------------------------------------------
     # utility
