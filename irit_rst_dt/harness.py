@@ -133,8 +133,8 @@ class IritHarness(Harness):
 
         if isinstance(rconf, IntraInterPair):
             return {
-                'inter:attach': _eval_model_path(rconf.inter, "attach"),
-                'inter:label': _eval_model_path(rconf.inter, "relate"),
+                'inter:attach': _eval_model_path(rconf.inter, "doc-attach"),
+                'inter:label': _eval_model_path(rconf.inter, "doc-relate"),
                 'intra:attach': _eval_model_path(rconf.intra, "sent-attach"),
                 'intra:label': _eval_model_path(rconf.intra, "sent-relate")
             }
