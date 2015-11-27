@@ -263,7 +263,7 @@ def _core_parsers(klearner, unique_real_root=True):
 _INTRA_INTER_CONFIGS = [
     Keyed('iheads', HeadToHeadParser),
     # Keyed('ionly', SentOnlyParser),
-    Keyed('isoft', SoftParser),
+    # Keyed('isoft', SoftParser),
 ]
 
 
