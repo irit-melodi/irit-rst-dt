@@ -7,6 +7,7 @@ In the future we may move this to a proper configuration file.
 # License: CeCILL-B (French BSD3-like)
 
 from __future__ import print_function
+import copy
 from os import path as fp
 import itertools as itr
 
@@ -367,14 +368,15 @@ def _evaluations():
 
     # == two-step parsers: intra then inter-sentential ==
     ii_learners = []  # (intra, inter) learners
-    ii_learners.extend((klearner, klearner)
+    ii_learners.extend((copy.deepcopy(klearner), copy.deepcopy(klearner))
                        for klearner in _LOCAL_LEARNERS)
     # structured learners, cf. supra
     intra_nonprob_eisner = EisnerDecoder(use_prob=False,
                                          unique_real_root=False)
     inter_nonprob_eisner = EisnerDecoder(use_prob=False,
                                          unique_real_root=True)
-    ii_learners.extend((l(intra_nonprob_eisner), l(inter_nonprob_eisner))
+    ii_learners.extend((copy.deepcopy(l)(intra_nonprob_eisner),
+                        copy.deepcopy(l)(inter_nonprob_eisner))
                        for l in _STRUCTURED_LEARNERS)
     # couples of learners with either sentence- or document-level oracle
     sorc_ii_learners = [
@@ -392,7 +394,7 @@ def _evaluations():
         # to have more than one real root ; this is necessary for the
         # Eisner decoder and probably others, with "hard" strategies
         ii_pairs.extend(IntraInterPair(intra=x, inter=y) for x, y in
-                        zip(_core_parsers(intra_lnr, unique_real_root=False),
+                        zip(_core_parsers(intra_lnr, unique_real_root=True),
                             _core_parsers(inter_lnr, unique_real_root=True)))
     # cross-product: pairs of parsers x intra-/inter- configs
     ii_parsers = [combine_intra(p, kconf,
