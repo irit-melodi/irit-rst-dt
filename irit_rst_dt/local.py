@@ -146,22 +146,28 @@ def decoder_eisner():
 
 def decoder_mst():
     "our instantiation of the mst decoder"
-    return Keyed('mst', MstDecoder(MstRootStrategy.fake_root, True))
+    return Keyed('mst', MstDecoder(MstRootStrategy.fake_root,
+                                   use_prob=True))
 
 
 def attach_learner_maxent():
     "return a keyed instance of maxent learner"
-    return Keyed('maxent', SklearnAttachClassifier(LogisticRegression()))
+    return Keyed('maxent',
+                 SklearnAttachClassifier(LogisticRegression(
+                     n_jobs=1)))
 
 
 def label_learner_maxent():
     "return a keyed instance of maxent learner"
-    return Keyed('maxent', SklearnLabelClassifier(LogisticRegression()))
+    return Keyed('maxent',
+                 SklearnLabelClassifier(LogisticRegression(
+                     n_jobs=1)))
 
 
 def attach_learner_dectree():
     "return a keyed instance of decision tree learner"
-    return Keyed('dectree', SklearnAttachClassifier(DecisionTreeClassifier()))
+    return Keyed('dectree',
+                 SklearnAttachClassifier(DecisionTreeClassifier()))
 
 
 def label_learner_dectree():
@@ -173,12 +179,15 @@ def label_learner_dectree():
 def attach_learner_rndforest():
     "return a keyed instance of random forest learner"
     return Keyed('rndforest',
-                 SklearnAttachClassifier(RandomForestClassifier()))
+                 SklearnAttachClassifier(RandomForestClassifier(
+                     n_estimators=100, n_jobs=1)))
 
 
 def label_learner_rndforest():
     "return a keyed instance of decision tree learner"
-    return Keyed('rndforest', SklearnLabelClassifier(RandomForestClassifier()))
+    return Keyed('rndforest',
+                 SklearnLabelClassifier(RandomForestClassifier(
+                     n_estimators=100, n_jobs=1)))
 
 
 _LOCAL_LEARNERS = [
@@ -372,7 +381,7 @@ def _evaluations():
                        for klearner in _LOCAL_LEARNERS)
     # structured learners, cf. supra
     intra_nonprob_eisner = EisnerDecoder(use_prob=False,
-                                         unique_real_root=False)
+                                         unique_real_root=True)
     inter_nonprob_eisner = EisnerDecoder(use_prob=False,
                                          unique_real_root=True)
     ii_learners.extend((copy.deepcopy(l)(intra_nonprob_eisner),
