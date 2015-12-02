@@ -13,6 +13,8 @@ from attelo.learning.perceptron import (Perceptron,
 from attelo.learning.local import (SklearnAttachClassifier,
                                    SklearnLabelClassifier)
 
+
+VERBOSE = 2  # verbosity level
 # parameters for local perceptrons
 LOCAL_N_ITER = 20
 LOCAL_AVG = True  # NB: sklearn perceptrons don't offer this option
@@ -21,7 +23,7 @@ LOCAL_USE_PROB = False  # NB: True would currently have no effect
 LOCAL_C = 1.0  # was: np.inf
 
 # parameters for structured perceptrons
-STRUC_N_ITER = 50
+STRUC_N_ITER = 20  # was 50
 STRUC_AVG = True  # NB: ibid
 STRUC_USE_PROB = False  # NB: ibid
 # parameter for structured passive-aggressive
@@ -46,13 +48,15 @@ def label_learner_perc():
 
 def attach_learner_pa():
     "return a keyed instance of passive aggressive learner"
-    learner = sk.PassiveAggressiveClassifier(C=LOCAL_C, n_iter=LOCAL_N_ITER)
+    learner = sk.PassiveAggressiveClassifier(C=LOCAL_C,
+                                             n_iter=LOCAL_N_ITER)
     return Keyed('pa', SklearnAttachClassifier(learner))
 
 
 def label_learner_pa():
     "return a keyed instance of passive aggressive learner"
-    learner = sk.PassiveAggressiveClassifier(C=LOCAL_C, n_iter=LOCAL_N_ITER)
+    learner = sk.PassiveAggressiveClassifier(C=LOCAL_C,
+                                             n_iter=LOCAL_N_ITER)
     return Keyed('pa', SklearnLabelClassifier(learner))
 
 
@@ -65,6 +69,7 @@ def attach_learner_dp_perc():
     return Keyed('dp-perc',
                  SklearnAttachClassifier(
                      Perceptron(n_iter=LOCAL_N_ITER,
+                                verbose=VERBOSE,
                                 average=LOCAL_AVG,
                                 use_prob=LOCAL_USE_PROB)))
 
@@ -74,6 +79,7 @@ def label_learner_dp_perc():
     return Keyed('dp-perc',
                  SklearnLabelClassifier(
                      Perceptron(n_iter=LOCAL_N_ITER,
+                                verbose=VERBOSE,
                                 average=LOCAL_AVG,
                                 use_prob=LOCAL_USE_PROB)))
 
@@ -84,6 +90,7 @@ def attach_learner_dp_pa():
                  SklearnAttachClassifier(
                      PassiveAggressive(C=LOCAL_C,
                                        n_iter=LOCAL_N_ITER,
+                                       verbose=VERBOSE,
                                        average=LOCAL_AVG,
                                        use_prob=LOCAL_USE_PROB)))
 
@@ -94,6 +101,7 @@ def label_learner_dp_pa():
                  SklearnLabelClassifier(
                      PassiveAggressive(C=LOCAL_C,
                                        n_iter=LOCAL_N_ITER,
+                                       verbose=VERBOSE,
                                        average=LOCAL_AVG,
                                        use_prob=LOCAL_USE_PROB)))
 
@@ -102,6 +110,7 @@ def attach_learner_dp_struct_perc(decoder):
     "structured perceptron learning"
     learner = StructuredPerceptron(decoder,
                                    n_iter=STRUC_N_ITER,
+                                   verbose=VERBOSE,
                                    average=STRUC_AVG,
                                    use_prob=STRUC_USE_PROB)
     return Keyed('dp-struct-perc', learner)
@@ -112,6 +121,7 @@ def attach_learner_dp_struct_pa(decoder):
     learner = StructuredPassiveAggressive(decoder,
                                           C=STRUC_C,
                                           n_iter=STRUC_N_ITER,
+                                          verbose=VERBOSE,
                                           average=STRUC_AVG,
                                           use_prob=STRUC_USE_PROB)
     return Keyed('dp-struct-pa', learner)
