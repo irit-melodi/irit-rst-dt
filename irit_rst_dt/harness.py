@@ -14,6 +14,8 @@ from attelo.io import (load_fold_dict,
 from attelo.parser.intra import (IntraInterPair)
 from attelo.util import (mk_rng)
 
+from educe.rst_dt.corpus import Reader  # WIP
+
 from .local import (CONFIG_FILE,
                     DETAILED_EVALUATIONS,
                     EVALUATIONS,
@@ -100,20 +102,40 @@ class IritHarness(Harness):
     # paths
     # ------------------------------------------------------
 
-    def _eval_data_path(self, ext, test_data=False):
-        """
-        Path to data file in the evaluation dir
-        """
-        dset = self.testset if test_data else self.dataset
-        return fp.join(self.eval_dir, "%s.%s" % (dset, ext))
-
     def mpack_paths(self, test_data, stripped=False):
+        """
+        Parameters
+        ----------
+        test_data: boolean
+            If true, the returned paths point to self.testset else to
+            self.dataset.
+
+        Returns
+        -------
+        path_to_edu_input : string
+
+        path_to_pairings : string
+
+        path_to_features : string
+
+        path_to_vocab : string
+
+        corpus_reader : educe.corpus.Reader
+            Corpus reader, to access gold structures. WIP
+        """
         ext = 'relations.sparse'
-        core_path = self._eval_data_path(ext, test_data=test_data)
+        # path to data file in the evaluation dir
+        dset = self.testset if test_data else self.dataset
+        core_path = fp.join(self.eval_dir, "%s.%s" % (dset, ext))
+        # WIP gold RST trees
+        corpus_reader = (Reader(TEST_CORPUS) if test_data
+                         else Reader(TRAINING_CORPUS))
+        # end WIP
         return (core_path + '.edu_input',
                 core_path + '.pairings',
                 (core_path + '.stripped') if stripped else core_path,
-                core_path + '.vocab')
+                core_path + '.vocab',
+                corpus_reader)
 
     def model_paths(self, rconf, fold):
         parent_dir = (self.fold_dir_path(fold) if fold is not None
