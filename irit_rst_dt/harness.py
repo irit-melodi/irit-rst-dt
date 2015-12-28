@@ -120,22 +120,22 @@ class IritHarness(Harness):
 
         path_to_vocab : string
 
-        corpus_reader : educe.corpus.Reader
-            Corpus reader, to access gold structures. WIP
+        corpus_path : string
+            Path to corpus in order to access gold structures (WIP).
         """
         ext = 'relations.sparse'
         # path to data file in the evaluation dir
         dset = self.testset if test_data else self.dataset
         core_path = fp.join(self.eval_dir, "%s.%s" % (dset, ext))
         # WIP gold RST trees
-        corpus_reader = (Reader(TEST_CORPUS) if test_data
-                         else Reader(TRAINING_CORPUS))
+        corpus_path = fp.abspath(TEST_CORPUS if test_data
+                                 else TRAINING_CORPUS)
         # end WIP
         return (core_path + '.edu_input',
                 core_path + '.pairings',
                 (core_path + '.stripped') if stripped else core_path,
                 core_path + '.vocab',
-                corpus_reader)
+                corpus_path)
 
     def model_paths(self, rconf, fold):
         parent_dir = (self.fold_dir_path(fold) if fold is not None
