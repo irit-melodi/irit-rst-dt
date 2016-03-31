@@ -14,13 +14,12 @@ from attelo.io import (load_fold_dict,
 from attelo.parser.intra import (IntraInterPair)
 from attelo.util import (mk_rng)
 
-from educe.rst_dt.corpus import Reader  # WIP
-
 from .local import (CONFIG_FILE,
                     DETAILED_EVALUATIONS,
                     EVALUATIONS,
                     FIXED_FOLD_FILE,
                     GRAPH_DOCS,
+                    METRICS,
                     TEST_CORPUS,
                     TEST_EVALUATION_KEY,
                     TRAINING_CORPUS)
@@ -68,6 +67,12 @@ class IritHarness(Harness):
     @property
     def detailed_evaluations(self):
         return DETAILED_EVALUATIONS
+
+    # WIP
+    @property
+    def metrics(self):
+        return METRICS
+    # end WIP
 
     @property
     def test_evaluation(self):
@@ -137,7 +142,29 @@ class IritHarness(Harness):
                 core_path + '.vocab',
                 corpus_path)
 
-    def model_paths(self, rconf, fold):
+    def model_paths(self, rconf, fold, parser):
+        """Paths to the learner(s) model(s).
+
+        Parameters
+        ----------
+        rconf : (IntraInterPair of) LearnerConfig
+            (Pair) of learner configurations.
+
+            See `attelo.parser.intra.IntraInterPair`,
+            `attelo.harness.config.LearnerConfig`
+
+        fold : TODO
+            TODO
+
+        parser : parser (WIP)
+            For IntraInterParser, enables to know which edges the inter
+            model has been fit on.
+
+        Returns
+        -------
+        paths : dict from string to pathname
+            Mapping from learner description to model paths.
+        """
         parent_dir = (self.fold_dir_path(fold) if fold is not None
                       else self.combined_dir_path())
 
@@ -154,11 +181,24 @@ class IritHarness(Harness):
             return fp.join(parent_dir, bname)
 
         if isinstance(rconf, IntraInterPair):
+            # WIP
+            sel_inter = parser.payload._sel_inter
+            inter_prefixes = {
+                'global': '',
+                'inter': 'doc-',
+                'head_to_head': 'doc_head-',
+                'frontier_to_head': 'doc_frontier-',
+            }
+            # end WIP
             return {
-                'inter:attach': _eval_model_path(rconf.inter, "doc-attach"),
-                'inter:label': _eval_model_path(rconf.inter, "doc-relate"),
-                'intra:attach': _eval_model_path(rconf.intra, "sent-attach"),
-                'intra:label': _eval_model_path(rconf.intra, "sent-relate")
+                'inter:attach': _eval_model_path(
+                    rconf.inter, inter_prefixes[sel_inter] + "attach"),
+                'inter:label': _eval_model_path(
+                    rconf.inter, inter_prefixes[sel_inter] + "relate"),
+                'intra:attach': _eval_model_path(
+                    rconf.intra, "sent-attach"),
+                'intra:label': _eval_model_path(
+                    rconf.intra, "sent-relate")
             }
         else:
             return {
