@@ -23,6 +23,7 @@ from attelo.learning.local import (SklearnAttachClassifier,
                                    SklearnLabelClassifier)
 from attelo.parser.intra import (IntraInterPair,
                                  HeadToHeadParser,
+                                 FrontierToHeadParser,
                                  # SentOnlyParser,
                                  SoftParser)
 
@@ -43,6 +44,7 @@ from .config.perceptron import (attach_learner_dp_pa,
                                 label_learner_pa,
                                 label_learner_perc)
 from .config.common import (ORACLE,
+                            ORACLE_INTER,
                             combined_key,
                             decoder_last,
                             decoder_local,
@@ -192,8 +194,6 @@ def label_learner_rndforest():
 
 _LOCAL_LEARNERS = [
     #    ORACLE,
-    #    LearnerConfig(attach=attach_learner_maxent(),
-    #                  label=label_learner_maxent()),
     LearnerConfig(attach=attach_learner_maxent(),
                   label=label_learner_maxent()),
     #    LearnerConfig(attach=attach_learner_maxent(),
@@ -270,10 +270,22 @@ def _core_parsers(klearner, unique_real_root=True):
 
 
 _INTRA_INTER_CONFIGS = [
-    Keyed('iheads', HeadToHeadParser),
+#    Keyed('ifrontier-inter', (FrontierToHeadParser, 'inter')),
+#    Keyed('ifrontier-head_to_head', (FrontierToHeadParser, 'head_to_head')),
+#    Keyed('ifrontier-frontier_to_head', (FrontierToHeadParser, 'frontier_to_head')),
+#    Keyed('ifrontier-global', (FrontierToHeadParser, 'global')),
+#    Keyed('iheads-inter', (HeadToHeadParser, 'inter')),
+#    Keyed('iheads-head_to_head', (HeadToHeadParser, 'head_to_head')),
+#    Keyed('iheads-frontier_to_head', (HeadToHeadParser, 'frontier_to_head')),
+    Keyed('iheads-global', (HeadToHeadParser, 'global')),
     # Keyed('ionly', SentOnlyParser),
     # Keyed('isoft', SoftParser),
 ]
+
+
+_VERBOSE_INTRA_INTER = False
+"""Toggle verbosity for intra/inter parsers ; if True, lost and hallucinated
+edges will be printed to stdout"""
 
 
 # -------------------------------------------------------------------------------
@@ -348,12 +360,14 @@ def _is_junk(econf):
         return True
 
     # oracle would be redundant with sentence/doc oracles
+    # FIXME the above is wrong for intra/inter parsers because gold edges
+    # can fall out of the search space
     if has.oracle and has_intra_oracle:
-        return True
+        return True  # FIXME should sometimes be False
 
     # toggle or comment to enable filtering in/out oracles
     if has_any_oracle:
-        return True
+        return True  # FIXME should sometimes be False
 
     return False
 
@@ -378,7 +392,11 @@ def _evaluations():
     # == two-step parsers: intra then inter-sentential ==
     ii_learners = []  # (intra, inter) learners
     ii_learners.extend((copy.deepcopy(klearner), copy.deepcopy(klearner))
-                       for klearner in _LOCAL_LEARNERS)
+                       for klearner in _LOCAL_LEARNERS
+                       if klearner != ORACLE)
+    # keep pointer to intra and inter oracles
+    ii_oracles = (copy.deepcopy(ORACLE), ORACLE_INTER)
+    ii_learners.append(ii_oracles)
     # structured learners, cf. supra
     intra_nonprob_eisner = EisnerDecoder(use_prob=False,
                                          unique_real_root=True)
@@ -389,10 +407,12 @@ def _evaluations():
                        for l in _STRUCTURED_LEARNERS)
     # couples of learners with either sentence- or document-level oracle
     sorc_ii_learners = [
-        (ORACLE, inter_lnr) for intra_lnr, inter_lnr in ii_learners
+        (ii_oracles[0], inter_lnr) for intra_lnr, inter_lnr in ii_learners
+        if (ii_oracles[0], inter_lnr) not in ii_learners
     ]
     dorc_ii_learners = [
-        (intra_lnr, ORACLE) for intra_lnr, inter_lnr in ii_learners
+        (intra_lnr, ii_oracles[1]) for intra_lnr, inter_lnr in ii_learners
+        if (intra_lnr, ii_oracles[1]) not in ii_learners
     ]
     # enumerate pairs of (intra, inter) parsers
     ii_pairs = []
@@ -403,12 +423,13 @@ def _evaluations():
         # to have more than one real root ; this is necessary for the
         # Eisner decoder and probably others, with "hard" strategies
         ii_pairs.extend(IntraInterPair(intra=x, inter=y) for x, y in
-                        zip(_core_parsers(intra_lnr, unique_real_root=True),
+                        zip(_core_parsers(intra_lnr, unique_real_root=True),  # TODO add unique_real_root to hyperparameters in grid search
                             _core_parsers(inter_lnr, unique_real_root=True)))
     # cross-product: pairs of parsers x intra-/inter- configs
     ii_parsers = [combine_intra(p, kconf,
                                 primary=('inter' if p.intra.settings.oracle
-                                         else 'intra'))
+                                         else 'intra'),
+                                verbose=_VERBOSE_INTRA_INTER)
                   for p, kconf
                   in itr.product(ii_pairs, _INTRA_INTER_CONFIGS)]
     res.extend(ii_parsers)
@@ -452,6 +473,14 @@ thing (mostly the graphs) takes time and space to build
 
 HINT: set to empty list for no graphs whatsoever
 """
+
+# WIP explicit selection of metrics
+METRICS = [
+    'edges',
+    'edges_by_label',
+    'edus',
+    'cspans'
+]
 
 
 def print_evaluations():

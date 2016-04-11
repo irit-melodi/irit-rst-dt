@@ -19,6 +19,7 @@ from .local import (CONFIG_FILE,
                     EVALUATIONS,
                     FIXED_FOLD_FILE,
                     GRAPH_DOCS,
+                    METRICS,
                     TEST_CORPUS,
                     TEST_EVALUATION_KEY,
                     TRAINING_CORPUS)
@@ -67,6 +68,12 @@ class IritHarness(Harness):
     def detailed_evaluations(self):
         return DETAILED_EVALUATIONS
 
+    # WIP
+    @property
+    def metrics(self):
+        return METRICS
+    # end WIP
+
     @property
     def test_evaluation(self):
         if TEST_CORPUS is None:
@@ -100,22 +107,64 @@ class IritHarness(Harness):
     # paths
     # ------------------------------------------------------
 
-    def _eval_data_path(self, ext, test_data=False):
-        """
-        Path to data file in the evaluation dir
-        """
-        dset = self.testset if test_data else self.dataset
-        return fp.join(self.eval_dir, "%s.%s" % (dset, ext))
-
     def mpack_paths(self, test_data, stripped=False):
+        """
+        Parameters
+        ----------
+        test_data: boolean
+            If true, the returned paths point to self.testset else to
+            self.dataset.
+
+        Returns
+        -------
+        path_to_edu_input : string
+
+        path_to_pairings : string
+
+        path_to_features : string
+
+        path_to_vocab : string
+
+        corpus_path : string
+            Path to corpus in order to access gold structures (WIP).
+        """
         ext = 'relations.sparse'
-        core_path = self._eval_data_path(ext, test_data=test_data)
+        # path to data file in the evaluation dir
+        dset = self.testset if test_data else self.dataset
+        core_path = fp.join(self.eval_dir, "%s.%s" % (dset, ext))
+        # WIP gold RST trees
+        corpus_path = fp.abspath(TEST_CORPUS if test_data
+                                 else TRAINING_CORPUS)
+        # end WIP
         return (core_path + '.edu_input',
                 core_path + '.pairings',
                 (core_path + '.stripped') if stripped else core_path,
-                core_path + '.vocab')
+                core_path + '.vocab',
+                corpus_path)
 
-    def model_paths(self, rconf, fold):
+    def model_paths(self, rconf, fold, parser):
+        """Paths to the learner(s) model(s).
+
+        Parameters
+        ----------
+        rconf : (IntraInterPair of) LearnerConfig
+            (Pair) of learner configurations.
+
+            See `attelo.parser.intra.IntraInterPair`,
+            `attelo.harness.config.LearnerConfig`
+
+        fold : TODO
+            TODO
+
+        parser : parser (WIP)
+            For IntraInterParser, enables to know which edges the inter
+            model has been fit on.
+
+        Returns
+        -------
+        paths : dict from string to pathname
+            Mapping from learner description to model paths.
+        """
         parent_dir = (self.fold_dir_path(fold) if fold is not None
                       else self.combined_dir_path())
 
@@ -132,11 +181,24 @@ class IritHarness(Harness):
             return fp.join(parent_dir, bname)
 
         if isinstance(rconf, IntraInterPair):
+            # WIP
+            sel_inter = parser.payload._sel_inter
+            inter_prefixes = {
+                'global': '',
+                'inter': 'doc-',
+                'head_to_head': 'doc_head-',
+                'frontier_to_head': 'doc_frontier-',
+            }
+            # end WIP
             return {
-                'inter:attach': _eval_model_path(rconf.inter, "doc-attach"),
-                'inter:label': _eval_model_path(rconf.inter, "doc-relate"),
-                'intra:attach': _eval_model_path(rconf.intra, "sent-attach"),
-                'intra:label': _eval_model_path(rconf.intra, "sent-relate")
+                'inter:attach': _eval_model_path(
+                    rconf.inter, inter_prefixes[sel_inter] + "attach"),
+                'inter:label': _eval_model_path(
+                    rconf.inter, inter_prefixes[sel_inter] + "relate"),
+                'intra:attach': _eval_model_path(
+                    rconf.intra, "sent-attach"),
+                'intra:label': _eval_model_path(
+                    rconf.intra, "sent-relate")
             }
         else:
             return {

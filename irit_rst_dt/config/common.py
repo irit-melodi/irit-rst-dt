@@ -64,6 +64,16 @@ def label_learner_oracle():
 ORACLE = LearnerConfig(attach=attach_learner_oracle(),
                        label=label_learner_oracle())
 
+
+# WIP oracles tailored for inter-sentential parsing
+def attach_learner_oracle_inter():
+    "return a keyed instance of the oracle (virtual) learner for inter"
+    return Keyed('oracle', AttachOracle())
+
+
+ORACLE_INTER = LearnerConfig(attach=attach_learner_oracle_inter(),
+                             label=label_learner_oracle())
+
 # ---------------------------------------------------------------------
 # baselines
 # ---------------------------------------------------------------------

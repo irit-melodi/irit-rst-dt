@@ -58,21 +58,6 @@ def config_argparser(psr):
                              help="generate report only (cluster mode)")
 
 
-def args_to_stage(args):
-    "return the cluster stage from the CLI args"
-
-    if args.start:
-        return ClusterStage.start
-    elif args.folds is not None:
-        return ClusterStage.main
-    elif args.combined_models:
-        return ClusterStage.combined_models
-    elif args.end:
-        return ClusterStage.end
-    else:
-        return None
-
-
 def main(args):
     """
     Subcommand main.
@@ -86,9 +71,21 @@ def main(args):
         mode = 'jumpstart'
     else:
         mode = None
+    # cluster stage from the CLI args
+    if args.start:
+        stage = ClusterStage.start
+    elif args.folds is not None:
+        stage = ClusterStage.main
+    elif args.combined_models:
+        stage = ClusterStage.combined_models
+    elif args.end:
+        stage = ClusterStage.end
+    else:
+        stage = None
+
     runcfg = RuntimeConfig(mode=mode,
                            folds=args.folds,
-                           stage=args_to_stage(args),
+                           stage=stage,
                            n_jobs=args.n_jobs)
     hconf = IritHarness()
     hconf.run(runcfg)

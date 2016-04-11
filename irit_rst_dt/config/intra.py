@@ -5,7 +5,7 @@ from attelo.harness.config import (EvaluationConfig,
 from .common import (Settings, combined_key)
 
 
-def combine_intra(econfs, kconf, primary='intra'):
+def combine_intra(econfs, kconf, primary='intra', verbose=False):
     """Combine a pair of EvaluationConfig into a single IntraInterParser
 
     Parameters
@@ -16,6 +16,13 @@ def combine_intra(econfs, kconf, primary='intra'):
 
     primary: ['intra', 'inter']
         Treat the intra/inter config as the primary one for the key
+    verbose: boolean, optional
+        Verbosity of the intra/inter parser
+
+    Returns
+    -------
+    econf : EvaluationConfig
+        Evaluation configuration for the IntraInterParser.
     """
     if primary == 'intra':
         econf = econfs.intra
@@ -31,8 +38,11 @@ def combine_intra(econfs, kconf, primary='intra'):
                         intra=True,
                         oracle=econf.settings.oracle,
                         children=subsettings)
+    iiparser_type, sel_inter = kconf.payload
     kparser = Keyed(combined_key(kconf, econf.parser),
-                    kconf.payload(parsers))
+                    iiparser_type(parsers,
+                                  sel_inter=sel_inter,
+                                  verbose=verbose))
     if learners.intra.key == learners.inter.key:
         learner_key = learners.intra.key
     else:
