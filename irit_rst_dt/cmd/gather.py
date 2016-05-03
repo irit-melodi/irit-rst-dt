@@ -29,25 +29,38 @@ def config_argparser(psr):
     You should create and pass in the subparser to which the flags
     are to be added.
     """
-    psr.add_argument("--skip-training",
-                     default=False, action="store_true",
-                     help="only gather test data")
+    psr.add_argument('--skip-training',
+                     action='store_true',
+                     help='only gather test data')
+    psr.add_argument('--coarse',
+                     action='store_true',
+                     help='use coarse-grained labels')
     psr.set_defaults(func=main)
 
 
-def extract_features(corpus, output_dir,
+def extract_features(corpus, output_dir, coarse,
                      vocab_path=None,
                      label_path=None):
-    """
-    Run feature extraction for a particular corpus; and store the
+    """Extract instances from a corpus, store them in files.
+
+    Run feature extraction for a particular corpus and store the
     results in the output directory. Output file name will be
-    computed from the corpus file name
+    computed from the corpus file name.
 
-    :type: corpus: filepath
-
-    :param: vocab_path: vocabulary to load for feature extraction
-    (needed if extracting test data; must ensure we have the same
-    vocab in test as we'd have in training)
+    Parameters
+    ----------
+    corpus: filepath
+        Path to the corpus.
+    output_dir: filepath
+        Path to the output folder.
+    coarse: boolean, True by default
+        Use coarse-grained relation labels.
+    vocab_path: filepath
+        Path to a fixed vocabulary mapping, for feature extraction
+        (needed if extracting test data: the same vocabulary should be
+        used in train and test).
+    label_path: filepath
+        Path to a list of labels.
     """
     # TODO: perhaps we could just directly invoke the appropriate
     # educe module here instead of going through the command line?
@@ -58,6 +71,12 @@ def extract_features(corpus, output_dir,
         output_dir,
         '--feature_set', FEATURE_SET,
     ]
+    # NEW 2016-05-03 use coarse- or fine-grained relation labels
+    # NB "coarse" was the previous default
+    if coarse:
+        cmd.extend([
+            '--coarse'
+        ])
     if CORENLP_OUT_DIR is not None:
         cmd.extend([
             '--corenlp_out_dir', CORENLP_OUT_DIR,
@@ -84,12 +103,12 @@ def main(args):
         tdir = latest_tmp()
     else:
         tdir = current_tmp()
-        extract_features(TRAINING_CORPUS, tdir)
+        extract_features(TRAINING_CORPUS, tdir, args.coarse)
     if TEST_CORPUS is not None:
         train_path = fp.join(tdir, fp.basename(TRAINING_CORPUS))
         label_path = train_path + '.relations.sparse'
         vocab_path = label_path + '.vocab'
-        extract_features(TEST_CORPUS, tdir,
+        extract_features(TEST_CORPUS, tdir, args.coarse,
                          vocab_path=vocab_path,
                          label_path=label_path)
     with open(os.path.join(tdir, "versions-gather.txt"), "w") as stream:
