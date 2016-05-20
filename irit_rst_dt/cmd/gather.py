@@ -23,11 +23,19 @@ NAME = 'gather'
 
 
 def config_argparser(psr):
-    """
-    Subcommand flags.
+    """Subcommand flags.
 
     You should create and pass in the subparser to which the flags
     are to be added.
+
+    Notes
+    -----
+    Could we remove intermediary layers and indirections?
+    For example, this script is a wrapper around
+    `educe.rst_dt.learning.cmd.extract`.
+    This means we need to explicitly expose some (or all?) of the
+    arguments of the latter script in the current one.
+    This does not look like a good idea.
     """
     psr.add_argument('--skip-training',
                      action='store_true',
@@ -35,10 +43,13 @@ def config_argparser(psr):
     psr.add_argument('--coarse',
                      action='store_true',
                      help='use coarse-grained labels')
+    psr.add_argument('--fix_pseudo_rels',
+                        action='store_true',
+                        help='fix pseudo-relation labels')
     psr.set_defaults(func=main)
 
 
-def extract_features(corpus, output_dir, coarse,
+def extract_features(corpus, output_dir, coarse, fix_pseudo_rels,
                      vocab_path=None,
                      label_path=None):
     """Extract instances from a corpus, store them in files.
@@ -53,8 +64,10 @@ def extract_features(corpus, output_dir, coarse,
         Path to the corpus.
     output_dir: filepath
         Path to the output folder.
-    coarse: boolean, True by default
+    coarse: boolean, False by default
         Use coarse-grained relation labels.
+    fix_pseudo_rels: boolean, False by default
+        Rewrite pseudo-relations to improve consistency (WIP).
     vocab_path: filepath
         Path to a fixed vocabulary mapping, for feature extraction
         (needed if extracting test data: the same vocabulary should be
@@ -71,6 +84,11 @@ def extract_features(corpus, output_dir, coarse,
         output_dir,
         '--feature_set', FEATURE_SET,
     ]
+    # NEW 2016-05-19 rewrite pseudo-relations
+    if fix_pseudo_rels:
+        cmd.extend([
+            '--fix_pseudo_rels'
+        ])
     # NEW 2016-05-03 use coarse- or fine-grained relation labels
     # NB "coarse" was the previous default
     if coarse:
@@ -103,12 +121,14 @@ def main(args):
         tdir = latest_tmp()
     else:
         tdir = current_tmp()
-        extract_features(TRAINING_CORPUS, tdir, args.coarse)
+        extract_features(TRAINING_CORPUS, tdir, args.coarse,
+                         args.fix_pseudo_rels)
     if TEST_CORPUS is not None:
         train_path = fp.join(tdir, fp.basename(TRAINING_CORPUS))
         label_path = train_path + '.relations.sparse'
         vocab_path = label_path + '.vocab'
         extract_features(TEST_CORPUS, tdir, args.coarse,
+                         args.fix_pseudo_rels,
                          vocab_path=vocab_path,
                          label_path=label_path)
     with open(os.path.join(tdir, "versions-gather.txt"), "w") as stream:
