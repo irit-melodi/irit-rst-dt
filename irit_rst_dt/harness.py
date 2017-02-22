@@ -47,7 +47,7 @@ class IritHarness(Harness):
             exit_ungathered()
         eval_dir, scratch_dir = prepare_dirs(runcfg, data_dir)
         self.load(runcfg, eval_dir, scratch_dir)
-        evidence_of_gathered = self.mpack_paths(False)[0]
+        evidence_of_gathered = self.mpack_paths(False)['edu_input']
         if not fp.exists(evidence_of_gathered):
             exit_ungathered()
         evaluate_corpus(self)
@@ -108,25 +108,23 @@ class IritHarness(Harness):
     # ------------------------------------------------------
 
     def mpack_paths(self, test_data, stripped=False):
-        """
+        """Return a dict of paths needed to read a datapack.
+
         Parameters
         ----------
-        test_data: boolean
-            If true, the returned paths point to self.testset else to
-            self.dataset.
+        test_data : boolean
+            If True, it's the test set we wanted, else the dataset.
+
+        stripped : boolean, defaults to False
+            If True, return path for a "stripped" version of the data
+            (faster loading, but only useful for scoring).
 
         Returns
         -------
-        path_to_edu_input : string
-
-        path_to_pairings : string
-
-        path_to_features : string
-
-        path_to_vocab : string
-
-        corpus_path : string
-            Path to corpus in order to access gold structures (WIP).
+        res : dict
+            Paths to files that enable to read a datapack.
+            Useful keys are 'edu_input', 'pairings', 'features', 'vocab',
+            'corpus' (WIP, used to access gold structures).
         """
         ext = 'relations.sparse'
         # path to data file in the evaluation dir
@@ -136,11 +134,13 @@ class IritHarness(Harness):
         corpus_path = fp.abspath(TEST_CORPUS if test_data
                                  else TRAINING_CORPUS)
         # end WIP
-        return (core_path + '.edu_input',
-                core_path + '.pairings',
-                (core_path + '.stripped') if stripped else core_path,
-                core_path + '.vocab',
-                corpus_path)
+        return {
+            'edu_input': core_path + '.edu_input',
+            'pairings': core_path + '.pairings',
+            'features': (core_path + '.stripped') if stripped else core_path,
+            'vocab': core_path + '.vocab',
+            'corpus': corpus_path
+        }
 
     def model_paths(self, rconf, fold, parser):
         """Paths to the learner(s) model(s).
